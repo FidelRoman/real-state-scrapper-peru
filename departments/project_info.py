@@ -22,9 +22,6 @@ def get_project_info(url):
         driver.get(url)
         
         # 2. Capturar los datos anteriores (fecha, medidas, tipo, dormitorios)
-        # --------------------------------------------------------------------
-        #    Buscamos el div con clase 'row proyecto-detalle'
-        #    y obtenemos los párrafos.
         try:
             element = driver.find_element(By.CLASS_NAME, 'row.proyecto-detalle')
             paragraphs = element.find_elements(By.TAG_NAME, 'p')
@@ -34,38 +31,35 @@ def get_project_info(url):
             tipo = paragraphs[2].text.strip() if len(paragraphs) > 2 else "N/A"
             dormitorios = paragraphs[3].text.strip() if len(paragraphs) > 3 else "N/A"
         except Exception:
-            # Si falla la parte anterior, ponemos en "N/A" cada valor
             fecha = "N/A"
             medidas = "N/A"
             tipo = "N/A"
             dormitorios = "N/A"
 
-        # NUEVO PASO: Hacer click en "ver más modelos" antes de buscar los div
-        # -------------------------------------------------------------------
+        # 3. Hacer click en "ver más modelos"
         try:
             ver_mas_link = driver.find_element(By.CSS_SELECTOR, 'a.ver-mas-modelos.mas')
             ver_mas_link.click()
-            # Tal vez dar un pequeño tiempo de espera para que el contenido se cargue:
-            time.sleep(2)  # Ajusta el tiempo según tus necesidades
+            time.sleep(2)  # Ajusta el tiempo según la demora en cargar
         except Exception as e:
             print("No se pudo hacer click en 'ver más modelos':", e)
 
-        # 3. Buscar todos los div con la clase "thumbnail-container col-sm-4 col-md-4 col-xs-12"
+        # 4. Buscar todos los div con la clase "thumbnail-container col-sm-4 col-md-4 col-xs-12"
         thumbnail_divs = driver.find_elements(
             By.CSS_SELECTOR,
             'div.thumbnail-container.col-sm-4.col-md-4.col-xs-12'
         )
 
-        # 4. Iterar sobre cada thumbnail-container y extraer la info
+        # 5. Iterar sobre cada thumbnail-container y extraer la info
         results = []
         for thumb in thumbnail_divs:
-            # a. Disponible: <p class="disponible">…</p>
+            # a. Disponible
             try:
                 disponible = thumb.find_element(By.CLASS_NAME, 'disponible').text.strip()
             except:
                 disponible = "N/A"
 
-            # b. Piso: dentro de un div con <span class="detalle_cabecera">Piso</span>
+            # b. Piso
             try:
                 piso = thumb.find_element(
                     By.XPATH,
@@ -74,7 +68,7 @@ def get_project_info(url):
             except:
                 piso = "N/A"
 
-            # c. Dormitorios (el que aparece dentro del contenedor, p. ej. "2 dorm.")
+            # c. Dormitorios
             try:
                 dormitorios_cont = thumb.find_element(
                     By.XPATH,
@@ -83,7 +77,7 @@ def get_project_info(url):
             except:
                 dormitorios_cont = "N/A"
 
-            # d. Área (p. ej. "86.99 m2")
+            # d. Área
             try:
                 area = thumb.find_element(
                     By.XPATH,
@@ -92,38 +86,42 @@ def get_project_info(url):
             except:
                 area = "N/A"
 
-            # e. Precio (p. ej. en h3.detalle_precio, que contenga "Precio desde")
+            # e. Modelo (nuevo)
             try:
-                # Generalmente es un h3 con la clase 'detalle_precio'
+                modelo = thumb.find_element(
+                    By.XPATH,
+                    './/div[span[@class="detalle_cabecera" and contains(text(),"Modelo")]]/span[@class="detalle"]'
+                ).text.strip()
+            except:
+                modelo = "N/A"
+
+            # f. Precio
+            try:
                 precio_text = thumb.find_element(By.CSS_SELECTOR, 'h3.detalle_precio').text
-                # El texto puede ser algo como:
-                #   "Precio desde\nS/ 482,540"
-                # Separamos la parte numérica
                 precio = precio_text.split('\n')[-1].replace('S/ ', '').strip()
             except:
                 precio = "N/A"
 
-            # f. Armar el diccionario con la data de la fila y la data general
+            # g. Diccionario de datos
             data_dict = {
                 "fecha": fecha,
                 "medidas": medidas,
                 "tipo": tipo,
-                "dormitorios": dormitorios,       # la info general
+                "dormitorios": dormitorios,       # info general
                 "disponible": disponible,
                 "piso": piso,
                 "dormitorios_cont": dormitorios_cont,
                 "area": area,
+                "modelo": modelo,                 # campo nuevo
                 "precio": precio
             }
 
             results.append(data_dict)
 
-        # 5. Retornar la lista de dicts (uno por cada contenedor)
         return results
 
     except Exception as e:
         print(f"Error general: {e}")
-        # Devolver lista vacía o lo que prefieras en caso de error
         return []
     finally:
         driver.quit()

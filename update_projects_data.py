@@ -1,5 +1,5 @@
 import pandas as pd
-from project_info import get_project_info
+from departments.project_info import get_project_info
 
 # Cargar el archivo CSV existente
 input_file = "projects_data.csv"

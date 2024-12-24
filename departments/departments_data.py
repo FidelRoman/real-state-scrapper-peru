@@ -2,7 +2,7 @@ import pandas as pd
 from project_info import get_project_info
 
 # Lectura del CSV con los proyectos
-input_file = "data/projects_data_demo.csv"
+input_file = "data/projects_data.csv"
 df_projects = pd.read_csv(input_file)
 
 # Verificar que exista la columna 'proyecto_link'

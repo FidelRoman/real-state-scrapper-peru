@@ -25,6 +25,9 @@ total_count = 0
 
 # Iteramos sobre cada bloque (chunk) de df_projects
 for i, chunk_df in enumerate(chunk_dataframe(df_projects, chunk_size=chunk_size), start=1):
+
+    if i < 6:
+        continue 
     # Aquí acumularemos todos los departamentos de ESTE chunk
     all_departments_chunk = []
 
@@ -46,7 +49,7 @@ for i, chunk_df in enumerate(chunk_dataframe(df_projects, chunk_size=chunk_size)
     df_departments_chunk = pd.DataFrame(all_departments_chunk)
 
     # Guardamos cada chunk de resultados en un archivo CSV distinto
-    output_file = f"data/departments_info{i}.csv"
+    output_file = f"data/departments_info_new_{i}.csv"
     df_departments_chunk.to_csv(output_file, index=False, encoding='utf-8')
 
     print(f"Archivo guardado con {len(df_departments_chunk)} filas: {output_file}")

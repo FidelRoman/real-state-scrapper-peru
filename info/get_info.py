@@ -1,6 +1,12 @@
 import pandas as pd
 import requests
 import time
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+api_key = os.getenv("GOOGLE_MAPS_API_KEY")
 
 # 📌 Configuración
 API_KEY = "AIzaSyBoXoPKfRQZ9Ca2y2XdxQUrZ_WCuNn_hgI"  # Reemplázala con tu clave
@@ -12,7 +18,7 @@ CATEGORIES = [
 RADIUS = 500  # Radio de búsqueda en metros
 
 # 📂 Cargar datos (solo 5 filas)
-df = pd.read_csv("data/data_w_coordinates.csv", usecols=["proyecto_link","latitude", "longitude"])
+df = pd.read_csv("data/data_w_coordinates.csv", usecols=["proyecto_link","latitude", "longitude"]).head(2)
 
 # 🔍 Función para consultar Google Places API
 def get_nearby_places(lat, lon):

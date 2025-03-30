@@ -12,7 +12,7 @@ CATEGORIES = [
 RADIUS = 500  # Radio de búsqueda en metros
 
 # 📂 Cargar datos (solo 5 filas)
-df = pd.read_csv("data/data_w_coordinates.csv", usecols=["proyecto_link","latitude", "longitude"]).head(2)
+df = pd.read_csv("data/data_w_coordinates.csv", usecols=["proyecto_link","latitude", "longitude"])
 
 # 🔍 Función para consultar Google Places API
 def get_nearby_places(lat, lon):

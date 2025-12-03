@@ -2,121 +2,144 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver.edge.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 
-def get_project_info(url):
+def get_project_info(url, driver=None):
     # Configuración de Selenium para Microsoft Edge
-    options = Options()
-    options.add_argument('--headless')  # Opcional: Ejecutar en modo headless
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--no-sandbox')
+    should_quit_driver = False
+    
+    if driver is None:
+        should_quit_driver = True
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-sandbox')
+        # Add user agent to avoid detection
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-    # Ruta a EdgeDriver (ajusta según tu ruta local)
-    driver_path = "/Users/fidel/Downloads/msedgedriver"
-    service = Service(driver_path)
-    driver = webdriver.Edge(service=service, options=options)
+        # Ruta a EdgeDriver (ajusta según tu ruta local)
+        driver_path = "/Users/fidel/Downloads/msedgedriver"
+        service = Service(driver_path)
+        driver = webdriver.Edge(service=service, options=options)
 
     try:
         # 1. Abrir la página web
         driver.get(url)
         
-        # 2. Capturar los datos anteriores (fecha, medidas, tipo, dormitorios)
+        # Wait for page to load
+        wait = WebDriverWait(driver, 10)
+        
+        # 2. Capturar los datos del proyecto (fecha, medidas, tipo, dormitorios)
+        fecha = "N/A"
+        medidas = "N/A"
+        tipo = "N/A"
+        dormitorios = "N/A"
+        
         try:
-            element = driver.find_element(By.CLASS_NAME, 'row.proyecto-detalle')
-            paragraphs = element.find_elements(By.TAG_NAME, 'p')
+            # Strategy 1: Look for "Detalles del proyecto" header and following text
+            try:
+                details_header = driver.find_element(By.XPATH, "//h3[contains(text(), 'Detalles del proyecto')]")
+                # Get the parent container of the header, which likely contains the details text
+                details_container = details_header.find_element(By.XPATH, "./..") 
+                container_text = details_container.text
+            except:
+                # Fallback: Get the entire body text if header not found
+                container_text = driver.find_element(By.TAG_NAME, "body").text
 
-            fecha = paragraphs[0].text.strip() if len(paragraphs) > 0 else "N/A"
-            medidas = paragraphs[1].text.strip() if len(paragraphs) > 1 else "N/A"
-            tipo = paragraphs[2].text.strip() if len(paragraphs) > 2 else "N/A"
-            dormitorios = paragraphs[3].text.strip() if len(paragraphs) > 3 else "N/A"
-        except Exception:
-            fecha = "N/A"
-            medidas = "N/A"
-            tipo = "N/A"
-            dormitorios = "N/A"
+            # Parse the text for keywords
+            # Example text: "Entrega inmediata ... 61.87 m2 total ... 2 dormitorios"
+            lines = container_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                # Exclude prices (containing S/ or $) from date check
+                if "S/" in line or "$" in line:
+                    continue
 
-        # 3. Hacer click en "ver más modelos"
-        try:
-            ver_mas_link = driver.find_element(By.CSS_SELECTOR, 'a.ver-mas-modelos.mas')
-            ver_mas_link.click()
-            time.sleep(2)  # Ajusta el tiempo según la demora en cargar
+                if "Entrega" in line or "Entregado" in line or "/" in line and len(line) < 12 and any(char.isdigit() for char in line):
+                     # Simple date heuristic or "Entrega" keyword
+                     if fecha == "N/A" and ("Entrega" in line or "/" in line):
+                        fecha = line
+                
+                if "m²" in line or "m2" in line:
+                    if medidas == "N/A":
+                        medidas = line
+                
+                if "dormitorios" in line.lower() or "dorms" in line.lower():
+                    if dormitorios == "N/A":
+                        dormitorios = line
+                
+                if "Tipo" in line or "Departamento" in line or "Casa" in line or "Lote" in line or "Oficina" in line:
+                     if tipo == "N/A" and len(line) < 30: # Avoid long sentences
+                        tipo = line
+
         except Exception as e:
-            print("No se pudo hacer click en 'ver más modelos':", e)
+            print(f"Error extracting project details: {e}")
 
-        # 4. Buscar todos los div con la clase "thumbnail-container col-sm-4 col-md-4 col-xs-12"
-        thumbnail_divs = driver.find_elements(
-            By.CSS_SELECTOR,
-            'div.thumbnail-container.col-sm-4.col-md-4.col-xs-12'
-        )
+        # 3. Buscar todos los modelos disponibles
+        # New selector based on inspection: div.fp-modelo-disponible
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.fp-modelo-disponible')))
+            model_divs = driver.find_elements(By.CSS_SELECTOR, 'div.fp-modelo-disponible')
+        except:
+            print("No models found with 'div.fp-modelo-disponible', trying fallback...")
+            model_divs = []
 
-        # 5. Iterar sobre cada thumbnail-container y extraer la info
         results = []
-        for thumb in thumbnail_divs:
-            # a. Disponible
+        for div in model_divs:
             try:
-                disponible = thumb.find_element(By.CLASS_NAME, 'disponible').text.strip()
-            except:
+                if not div.text.strip():
+                    continue
+                
+                text_content = div.text.split('\n')
+                
+                # Initialize fields
                 disponible = "N/A"
-
-            # b. Piso
-            try:
-                piso = thumb.find_element(
-                    By.XPATH,
-                    './/div[span[@class="detalle_cabecera" and text()="Piso"]]/span[@class="detalle"]'
-                ).text.strip()
-            except:
-                piso = "N/A"
-
-            # c. Dormitorios
-            try:
-                dormitorios_cont = thumb.find_element(
-                    By.XPATH,
-                    './/div[span[@class="detalle_cabecera" and contains(text(),"Dormitorios")]]/span[@class="detalle"]'
-                ).text.strip()
-            except:
-                dormitorios_cont = "N/A"
-
-            # d. Área
-            try:
-                area = thumb.find_element(
-                    By.XPATH,
-                    './/div[span[@class="detalle_cabecera" and contains(text(),"Área")]]/span[@class="detalle"]'
-                ).text.strip()
-            except:
-                area = "N/A"
-
-            # e. Modelo (nuevo)
-            try:
-                modelo = thumb.find_element(
-                    By.XPATH,
-                    './/div[span[@class="detalle_cabecera" and contains(text(),"Modelo")]]/span[@class="detalle"]'
-                ).text.strip()
-            except:
-                modelo = "N/A"
-
-            # f. Precio
-            try:
-                precio_text = thumb.find_element(By.CSS_SELECTOR, 'h3.detalle_precio').text
-                precio = precio_text.split('\n')[-1].replace('S/ ', '').strip()
-            except:
                 precio = "N/A"
+                modelo = "N/A"
+                area = "N/A"
+                piso = "N/A"
+                dormitorios_cont = "N/A"
+                
+                # Parse text lines
+                # Example text content list:
+                # ['1 unidad disponible', 'Desde', 'S/ 429,900', 'Modelo Tipo 5', '61.87 m²', 'Piso 2', '2 dorms.', '2 baños', 'COTIZAR AHORA']
+                
+                for line in text_content:
+                    line = line.strip()
+                    if "disponible" in line.lower():
+                        disponible = line
+                    elif "S/" in line or "$" in line:
+                        precio = line.replace('S/ ', '').replace('$', '').strip()
+                    elif line.startswith("Modelo"):
+                        modelo = line
+                    elif "m²" in line:
+                        area = line
+                    elif "Piso" in line:
+                        piso = line
+                    elif "dorms" in line.lower() or "dormitorios" in line.lower():
+                        dormitorios_cont = line
 
-            # g. Diccionario de datos
-            data_dict = {
-                "fecha": fecha,
-                "medidas": medidas,
-                "tipo": tipo,
-                "dormitorios": dormitorios,       # info general
-                "disponible": disponible,
-                "piso": piso,
-                "dormitorios_cont": dormitorios_cont,
-                "area": area,
-                "modelo": modelo,                 # campo nuevo
-                "precio": precio
-            }
-
-            results.append(data_dict)
+                # Data Dictionary
+                data_dict = {
+                    "fecha": fecha,
+                    "medidas": medidas,
+                    "tipo": tipo,
+                    "dormitorios": dormitorios,       # info general
+                    "disponible": disponible,
+                    "piso": piso,
+                    "dormitorios_cont": dormitorios_cont,
+                    "area": area,
+                    "modelo": modelo,
+                    "precio": precio
+                }
+                results.append(data_dict)
+                
+            except Exception as e:
+                print(f"Error parsing model card: {e}")
+                continue
 
         return results
 
@@ -124,4 +147,5 @@ def get_project_info(url):
         print(f"Error general: {e}")
         return []
     finally:
-        driver.quit()
+        if should_quit_driver:
+            driver.quit()

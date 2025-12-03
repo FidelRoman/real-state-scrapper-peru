@@ -1,0 +1,7 @@
+Instrucciones:
+1. Utilizar get_project_info.py para obtener la lista de proyectos.
+2. Copiar la lista de proyectos a google sheet y agregar latitud y longitud
+3. Utilizar departments_data_batch.py para obtener la información de los departamentos.
+
+Notas:
+- Ya no es necesario utilizar departments_data.py ni project_data_updated.csv

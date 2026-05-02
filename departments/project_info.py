@@ -98,6 +98,7 @@ def get_project_info(url, driver=None):
                 # Initialize fields
                 disponible = "N/A"
                 precio = "N/A"
+                divisa = "N/A"
                 modelo = "N/A"
                 area = "N/A"
                 piso = "N/A"
@@ -112,7 +113,12 @@ def get_project_info(url, driver=None):
                     if "disponible" in line.lower():
                         disponible = line
                     elif "S/" in line or "$" in line:
-                        precio = line.replace('S/ ', '').replace('$', '').strip()
+                        if "S/" in line:
+                            divisa = "Soles"
+                            precio = line.replace('S/', '').strip()
+                        elif "$" in line:
+                            divisa = "Dólares"
+                            precio = line.replace('$', '').strip()
                     elif line.startswith("Modelo"):
                         modelo = line
                     elif "m²" in line:
@@ -133,6 +139,7 @@ def get_project_info(url, driver=None):
                     "dormitorios_cont": dormitorios_cont,
                     "area": area,
                     "modelo": modelo,
+                    "divisa": divisa,
                     "precio": precio
                 }
                 results.append(data_dict)

@@ -1,0 +1,43 @@
+name: Ejecutar Scraper Real Estate
+
+on:
+  schedule:
+    # Se ejecuta todos los domingos a las 5:00 AM UTC (12:00 AM hora Perú aprox)
+    - cron: '0 5 * * 0'
+  workflow_dispatch: # Permite ejecutarlo manualmente con un botón en GitHub
+
+permissions:
+  contents: write # Necesario para poder hacer commit y push de vuelta al repositorio
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Instalar Microsoft Edge
+        uses: browser-actions/setup-edge@v3
+
+      - name: Instalar dependencias de Python
+        run: pip install -r requirements.txt
+          
+      - name: Ejecutar get_projects.py (Paso 1)
+        run: python projects/get_projects.py
+        
+      - name: Ejecutar run_project_info_batch.py (Paso 2)
+        run: python departments/run_project_info_batch.py
+
+      - name: Guardar cambios (Commit y Push del CSV)
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/*.csv
+          git commit -m "Actualización automática de datos [skip ci]" || echo "No hay cambios para guardar"
+          git push

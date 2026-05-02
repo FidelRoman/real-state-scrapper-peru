@@ -20,9 +20,8 @@ def get_project_info(url, driver=None):
         # Add user agent to avoid detection
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-        # Ruta a EdgeDriver (ajusta según tu ruta local)
-        driver_path = "/Users/fidel/Downloads/msedgedriver"
-        service = Service(driver_path)
+        from webdriver_manager.microsoft import EdgeChromiumDriverManager
+        service = Service(EdgeChromiumDriverManager().install())
         driver = webdriver.Edge(service=service, options=options)
 
     try:

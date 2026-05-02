@@ -37,8 +37,8 @@ def create_driver():
     options.add_argument('--no-sandbox')
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
     
-    driver_path = "/Users/fidel/Downloads/msedgedriver"
-    service = Service(driver_path)
+    from webdriver_manager.microsoft import EdgeChromiumDriverManager
+    service = Service(EdgeChromiumDriverManager().install())
     return webdriver.Edge(service=service, options=options)
 
 print(f"Iniciando procesamiento de {len(df_projects)} proyectos...")

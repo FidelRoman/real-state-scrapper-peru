@@ -23,7 +23,11 @@ jobs:
           cache: 'pip'
 
       - name: Instalar Microsoft Edge
-        uses: browser-actions/setup-edge@v3
+        run: |
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /usr/share/keyrings/microsoft-edge.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-edge.gpg] https://packages.microsoft.com/repos/edge stable main" | sudo tee /etc/apt/sources.list.d/microsoft-edge.list
+          sudo apt-get update
+          sudo apt-get install -y microsoft-edge-stable
 
       - name: Instalar dependencias de Python
         run: pip install -r requirements.txt

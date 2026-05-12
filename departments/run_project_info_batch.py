@@ -1,8 +1,8 @@
 import pandas as pd
 from project_info import get_project_info
 from selenium import webdriver
-from selenium.webdriver.edge.service import Service
-from selenium.webdriver.edge.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from tqdm import tqdm
 import time
 
@@ -37,9 +37,9 @@ def create_driver():
     options.add_argument('--no-sandbox')
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
     
-    from webdriver_manager.microsoft import EdgeChromiumDriverManager
-    service = Service(EdgeChromiumDriverManager().install())
-    return webdriver.Edge(service=service, options=options)
+    from webdriver_manager.chrome import ChromeDriverManager
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=options)
 
 print(f"Iniciando procesamiento de {len(df_projects)} proyectos...")
 

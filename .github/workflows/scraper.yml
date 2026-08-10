@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write # Necesario para poder hacer commit y push de vuelta al repositorio
 
+concurrency:
+  group: scraper
+  cancel-in-progress: false
+
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
@@ -31,10 +35,47 @@ jobs:
       - name: Ejecutar run_project_info_batch.py (Paso 2)
         run: python departments/run_project_info_batch.py
 
-      - name: Guardar cambios (Commit y Push del CSV)
+      # Sin el secret, build_data.py usa el snapshot commiteado en
+      # dashboard/snapshot/ y el dashboard se regenera igual (sin refrescar
+      # coordenadas). La credencial nunca se escribe a disco.
+      - name: Regenerar los datos del dashboard (Paso 3)
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python dashboard/build_data.py
+
+      - name: Guardar cambios (Commit y Push)
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/*.csv
+          git add data/*.csv dashboard/data dashboard/snapshot
           git commit -m "Actualización automática de datos [skip ci]" || echo "No hay cambios para guardar"
           git push
+
+  # Publica dashboard/ en GitHub Pages. Requiere activar Pages en
+  # Settings -> Pages -> Source: GitHub Actions.
+  deploy-pages:
+    needs: run-scraper
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir la carpeta dashboard/
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+
+      - name: Desplegar
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mercado inmobiliario de Lima · Dashboard</title>
+  <meta name="description" content="Proyectos y unidades en venta en Lima: mapa, precios por m², filtros y análisis por distrito, etapa e inmobiliaria.">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <p>Cargando datos del mercado…</p>
+</div>
+
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>Mercado inmobiliario de <span>Lima</span></h1>
+      <p>Proyectos en venta publicados en Nexo Inmobiliario, con precios normalizados a soles y
+         geolocalizados por distrito. Filtra arriba: todo el tablero responde a la misma selección.</p>
+    </div>
+    <div class="meta">
+      <span class="meta-pill" id="meta-fecha">Actualizado —</span>
+      <span class="meta-pill" id="meta-tc">TC —</span>
+      <span class="meta-pill" id="meta-cobertura">—</span>
+    </div>
+  </header>
+
+  <!-- Filtros: una sola fila, alcance global -->
+  <section class="filters" id="filters" aria-label="Filtros">
+    <div class="filter" data-filter="distrito">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Distrito</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="etapa">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Etapa</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="inmobiliaria">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Inmobiliaria</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="dorm">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Dormitorios</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="tipo">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Tipo</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="entrega">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Entrega</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="precio">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Precio</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="filter" data-filter="area">
+      <button class="filter-btn" type="button" aria-expanded="false">
+        <span class="lbl">Área</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <button class="ghost-btn" type="button" id="btn-reset">Limpiar todo</button>
+  </section>
+
+  <div class="chips" id="chips"></div>
+
+  <!-- KPIs -->
+  <section class="kpis" aria-label="Indicadores">
+    <div class="card kpi hero">
+      <div class="label">Precio mediano por metro cuadrado</div>
+      <div class="value"><span id="kpi-m2">—</span><span class="unit">S/ /m²</span></div>
+      <div class="sub" id="kpi-m2-sub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Proyectos</div>
+      <div class="value" id="kpi-proyectos">—</div>
+      <div class="sub" id="kpi-proyectos-sub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Unidades disponibles</div>
+      <div class="value" id="kpi-unidades">—</div>
+      <div class="sub" id="kpi-unidades-sub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Ticket mediano</div>
+      <div class="value" id="kpi-ticket">—</div>
+      <div class="sub" id="kpi-ticket-sub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Distritos · inmobiliarias</div>
+      <div class="value" id="kpi-cobertura">—</div>
+      <div class="sub" id="kpi-cobertura-sub">—</div>
+    </div>
+  </section>
+
+  <!-- Mapa -->
+  <section class="card map-card" aria-label="Mapa">
+    <div class="map-head">
+      <div>
+        <h2 class="card-title">Dónde está la oferta</h2>
+        <p class="card-sub">El área del círculo es proporcional a las unidades disponibles; el color, al precio
+           mediano por m² del proyecto. Pasa el cursor por un distrito o un proyecto para ver el detalle.</p>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="map-legend" id="map-legend"></div>
+  </section>
+
+  <!-- Gráficos -->
+  <section class="charts" aria-label="Gráficos">
+    <div class="card chart-card span-3">
+      <div class="head">
+        <h2 class="card-title">Precio mediano por m² y distrito</h2>
+        <p class="card-sub">Soles por metro cuadrado. Clic en una barra para filtrar el distrito.</p>
+      </div>
+      <div class="chart-box ranked" id="ch-distritos"></div>
+    </div>
+
+    <div class="card chart-card span-3">
+      <div class="head">
+        <h2 class="card-title">Área frente a precio</h2>
+        <p class="card-sub">Cada punto es un modelo de departamento; el color indica los dormitorios.</p>
+      </div>
+      <div class="chart-box ranked" id="ch-scatter"></div>
+    </div>
+
+    <div class="card chart-card span-2">
+      <div class="head">
+        <h2 class="card-title">Distribución de precios</h2>
+        <p class="card-sub">Unidades disponibles por rango de precio, en soles.</p>
+      </div>
+      <div class="chart-box" id="ch-precios"></div>
+    </div>
+
+    <div class="card chart-card span-2">
+      <div class="head">
+        <h2 class="card-title">Mix de dormitorios</h2>
+        <p class="card-sub">Unidades disponibles según número de dormitorios.</p>
+      </div>
+      <div class="chart-box" id="ch-dorm"></div>
+    </div>
+
+    <div class="card chart-card span-2">
+      <div class="head">
+        <h2 class="card-title">Cronograma de entregas</h2>
+        <p class="card-sub">Unidades por trimestre de entrega y etapa del proyecto.</p>
+      </div>
+      <div class="chart-box" id="ch-entregas"></div>
+    </div>
+
+    <div class="card chart-card span-3">
+      <div class="head">
+        <h2 class="card-title">Inmobiliarias con más unidades disponibles</h2>
+        <p class="card-sub">Top 15. Clic en una barra para filtrar por esa inmobiliaria.</p>
+      </div>
+      <div class="chart-box tall" id="ch-firmas"></div>
+    </div>
+
+    <div class="card chart-card span-3">
+      <div class="head">
+        <h2 class="card-title">Etapa del proyecto por distrito</h2>
+        <p class="card-sub">Top 12 distritos por unidades disponibles.</p>
+      </div>
+      <div class="chart-box tall" id="ch-etapas"></div>
+    </div>
+  </section>
+
+  <!-- Tabla -->
+  <section class="card table-card" aria-label="Detalle de unidades">
+    <div class="table-head">
+      <div>
+        <h2 class="card-title">Detalle de unidades</h2>
+        <p class="card-sub" id="table-sub">—</p>
+      </div>
+      <div class="table-tools">
+        <input type="search" class="search-input" id="table-search" placeholder="Buscar proyecto, inmobiliaria o modelo…" aria-label="Buscar en la tabla">
+        <button class="ghost-btn" type="button" id="btn-export">Exportar CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll" id="table-scroll">
+      <table id="table">
+        <thead>
+          <tr>
+            <th data-sort="proyecto">Proyecto</th>
+            <th data-sort="distrito">Distrito</th>
+            <th data-sort="etapa">Etapa</th>
+            <th data-sort="inmobiliaria">Inmobiliaria</th>
+            <th data-sort="modelo">Modelo</th>
+            <th class="num" data-sort="dorm">Dorm.</th>
+            <th class="num" data-sort="area">Área m²</th>
+            <th class="num" data-sort="precio_pen">Precio S/</th>
+            <th class="num" data-sort="precio_m2">S/ /m²</th>
+            <th class="num" data-sort="unidades">Unid.</th>
+            <th data-sort="entrega">Entrega</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="table-foot" id="table-foot"></div>
+  </section>
+
+  <p class="footnote">
+    Fuente: <a href="https://nexoinmobiliario.pe" target="_blank" rel="noopener">Nexo Inmobiliario</a>,
+    scrapeado por este repositorio · coordenadas y ubigeos desde Google Sheets · límites distritales del INEI.<br>
+    Los precios en dólares se convierten a soles al tipo de cambio indicado arriba; las unidades sin precio publicado
+    se cuentan pero no entran en las medianas de S/ /m².
+  </p>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

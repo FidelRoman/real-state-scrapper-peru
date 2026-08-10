@@ -3,3 +3,5 @@ requests
 selenium
 webdriver-manager
 tqdm
+gspread
+google-auth

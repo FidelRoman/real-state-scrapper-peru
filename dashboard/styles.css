@@ -557,6 +557,31 @@ body::before {
 
 .leaflet-popup-content { margin: 0; width: 306px !important; }
 .leaflet-popup-tip { background: var(--surface-2); border: 1px solid var(--border-strong); }
+
+/* La ficha se desplaza para caber en el mapa (placePopup); el pico se corre en
+   sentido contrario para seguir señalando la burbuja. */
+.leaflet-popup-tip-container { left: calc(50% + var(--tip-shift, 0px)); }
+
+/* Ficha volteada bajo la burbuja: el pico pasa arriba y apunta hacia ella. */
+.leaflet-popup.is-below .leaflet-popup-tip-container {
+  top: -19px;
+  margin-top: 0;
+}
+.leaflet-popup.is-below .leaflet-popup-tip { margin: 11px auto 0; }
+
+/* Ficha a un lado de la burbuja: el pico pasa al canto, a su altura. */
+.leaflet-popup.is-side .leaflet-popup-tip-container {
+  left: auto;
+  right: auto;
+  top: var(--tip-top, 50%);
+  width: 20px;
+  height: 40px;
+  margin: -20px 0 0;
+}
+.leaflet-popup.is-side-right .leaflet-popup-tip-container { left: -19px; }
+.leaflet-popup.is-side-left .leaflet-popup-tip-container { right: -19px; }
+.leaflet-popup.is-side-right .leaflet-popup-tip { margin: 10.5px 0 0 11px; }
+.leaflet-popup.is-side-left .leaflet-popup-tip { margin: 10.5px 0 0 -10px; }
 .leaflet-popup-close-button { color: var(--ink-muted) !important; padding: 8px 8px 0 0 !important; }
 .leaflet-container { font-family: var(--font); background: #0a0c10; }
 .leaflet-control-attribution {

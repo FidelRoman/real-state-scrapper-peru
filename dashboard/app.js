@@ -73,6 +73,10 @@
     return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
 
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
   function isMobile() {
     return window.matchMedia('(max-width: 720px), (max-width: 900px) and (max-height: 500px)').matches;
   }
@@ -285,7 +289,7 @@
     legendEl = document.getElementById('map-legend');
     initHoverCardBridge();
     buildProjectMarkers();
-    map.on('zoomend', function () { renderMap(lastSelection); });
+    map.on('zoomend', function () { renderMap(lastSelection); repositionOpenPopup(); });
 
     // El contenedor puede medir 0 px cuando Leaflet se inicializa dentro de la
     // tarjeta (según cuándo termine el layout), y entonces fitBounds salta al
@@ -394,15 +398,15 @@
         color: '#0a0c10', weight: 1.5, opacity: 0.92
       });
       marker._projectData = p;
+      // Sin autoPan ni keepInView: la ficha nunca empuja el mapa. De que quepa
+      // en pantalla se encarga placePopup(), moviendo la ficha, no la vista.
       marker.bindPopup(function () { return projectPopup(p); }, {
         maxWidth: 308,
         minWidth: 294,
         maxHeight: 500,
         closeButton: true,
-        autoPan: true,
-        autoPanPaddingTopLeft: L.point(62, 24),
-        autoPanPaddingBottomRight: L.point(24, 24),
-        keepInView: true
+        autoPan: false,
+        keepInView: false
       });
       bindHoverCard(marker, p);
       markerByLink[p.link] = marker;
@@ -411,22 +415,30 @@
   }
 
   /**
-   * Abre la ficha del proyecto al pasar el ratón. El cierre se retrasa unos
-   * milisegundos: si el puntero pasa del círculo a la ficha, se cancela, así el
+   * Abre la ficha del proyecto al pasar el ratón. La apertura espera un momento
+   * para que barrer el mapa no dispare fichas a cada paso; el cierre también se
+   * retrasa: si el puntero pasa del círculo a la ficha, se cancela, así el
    * enlace y el texto siguen siendo alcanzables. Un clic la deja fijada.
    */
+  var HOVER_OPEN_DELAY = 320;
   var hoverTimer = null;
+  var openTimer = null;
   var pinned = null;
 
   function bindHoverCard(marker, project) {
     marker.on('mouseover', function () {
       if (isMobile()) return;
       clearTimeout(hoverTimer);
+      clearTimeout(openTimer);
       marker.setStyle({ fillOpacity: 1, weight: 3 });
-      if (!view.selectedLink) marker.openPopup();
+      if (view.selectedLink) return;
+      openTimer = setTimeout(function () {
+        if (!view.selectedLink) openMarkerPopup(marker);
+      }, HOVER_OPEN_DELAY);
     });
     marker.on('mouseout', function () {
       if (isMobile()) return;
+      clearTimeout(openTimer);
       renderMap(lastSelection);
       if (view.selectedLink === project.link) return;
       scheduleCardClose();
@@ -439,12 +451,118 @@
 
   function scheduleCardClose() {
     clearTimeout(hoverTimer);
+    clearTimeout(openTimer);
     hoverTimer = setTimeout(function () { if (!view.selectedLink) map.closePopup(); }, 220);
+  }
+
+  // --- Colocación de la ficha -----------------------------------------------
+  // El mapa nunca se mueve para hacer sitio a la ficha (autoPan está apagado):
+  // es la ficha la que se recoloca dentro del contenedor.
+  var POPUP_PAD = 14;                       // aire mínimo contra los bordes
+  var POPUP_BASE_OFFSET = L.point(0, 7);    // el desplazamiento de Leaflet por defecto
+
+  function popupMaxHeight() {
+    return Math.max(220, (map ? map.getSize().y : 560) - POPUP_PAD * 2 - 24);
+  }
+
+  function openMarkerPopup(marker) {
+    var popup = marker.getPopup();
+    // La altura disponible depende del alto del mapa en este momento; Leaflet la
+    // aplica al maquetar y añade scroll interno si la ficha no cabe entera.
+    if (popup) popup.options.maxHeight = popupMaxHeight();
+    marker.openPopup();
+  }
+
+  function repositionPopup(popup) {
+    if (typeof popup._updatePosition === 'function') popup._updatePosition();
+    else popup.update();
+  }
+
+  /**
+   * Recoloca la ficha para que quepa sin tocar la vista. Por defecto va encima
+   * de la burbuja; si no cabe se voltea debajo, y si tampoco cabe (burbuja en la
+   * franja central) se va a un lado. El pico se recoloca para seguir apuntando a
+   * la burbuja en los tres casos.
+   */
+  function placePopup(popup) {
+    if (!map || !popup || !popup.getLatLng) return;
+    var el = popup.getElement();
+    if (!el) return;
+
+    // Los popups se reutilizan entre aperturas: medimos siempre desde limpio.
+    el.classList.remove('is-below', 'is-side', 'is-side-left', 'is-side-right');
+    el.style.removeProperty('--tip-shift');
+    el.style.removeProperty('--tip-top');
+    popup.options.offset = POPUP_BASE_OFFSET;
+    repositionPopup(popup);
+
+    var box = map.getContainer().getBoundingClientRect();
+    var card = el.getBoundingClientRect();
+    var top = card.top - box.top;
+    var left = card.left - box.left;
+    var right = card.right - box.left;
+    var anchor = map.latLngToContainerPoint(popup.getLatLng());
+
+    // Si la burbuja se ha salido de la vista (zoom o arrastre con la ficha
+    // fijada), la ficha la acompaña: no tiene sentido colocarla apuntando a algo
+    // que ya no está en pantalla.
+    if (anchor.x < 0 || anchor.y < 0 || anchor.x > box.width || anchor.y > box.height) return;
+
+    var source = popup._source;
+    var gap = ((source && source.getRadius) ? source.getRadius() : 6) + 14;
+    var dx = 0;
+    var dy = 0;
+    var mode = '';
+
+    if (top < POPUP_PAD) {
+      if (anchor.y + gap + card.height <= box.height - POPUP_PAD) {
+        mode = 'below';
+        dy = (anchor.y + gap) - top;
+      } else {
+        // Ni encima ni debajo: al lado, centrada en la burbuja, sin taparla.
+        mode = 'side';
+        dy = clamp(anchor.y - card.height / 2, POPUP_PAD, box.height - POPUP_PAD - card.height) - top;
+        var roomRight = box.width - POPUP_PAD - (anchor.x + gap);
+        var roomLeft = (anchor.x - gap) - POPUP_PAD;
+        if (roomRight >= card.width || roomRight >= roomLeft) {
+          dx = (anchor.x + gap) - left;
+          el.classList.add('is-side-right');
+        } else {
+          dx = (anchor.x - gap - card.width) - left;
+          el.classList.add('is-side-left');
+        }
+      }
+    }
+
+    // Encaje final dentro del contenedor, ya con el desplazamiento aplicado.
+    if (left + dx < POPUP_PAD) dx += POPUP_PAD - (left + dx);
+    else if (right + dx > box.width - POPUP_PAD) dx += (box.width - POPUP_PAD) - (right + dx);
+    if (top + dy < POPUP_PAD) dy += POPUP_PAD - (top + dy);
+
+    if (mode) el.classList.add(mode === 'below' ? 'is-below' : 'is-side');
+    if (dx || dy) {
+      popup.options.offset = POPUP_BASE_OFFSET.add(L.point(dx, dy));
+      repositionPopup(popup);
+    }
+    if (mode === 'side') {
+      // El pico va en el canto lateral, a la altura de la burbuja.
+      el.style.setProperty('--tip-top', clamp(anchor.y - (top + dy), 26, card.height - 26) + 'px');
+    } else if (dx) {
+      var limit = Math.max(card.width / 2 - 26, 0);
+      el.style.setProperty('--tip-shift', clamp(-dx, -limit, limit) + 'px');
+    }
+  }
+
+  var activePopup = null;
+
+  function repositionOpenPopup() {
+    if (activePopup) placePopup(activePopup);
   }
 
   function initHoverCardBridge() {
     map.on('popupopen', function (e) {
       if (legendEl) legendEl.classList.add('has-popup');
+      activePopup = e.popup;
       var el = e.popup.getElement();
       if (!el) return;
       var closeButton = el.querySelector('.leaflet-popup-close-button');
@@ -457,9 +575,12 @@
         el.addEventListener('mouseenter', function () { clearTimeout(hoverTimer); });
         el.addEventListener('mouseleave', function () { if (!view.selectedLink) scheduleCardClose(); });
       }
+      // Síncrono: la posición final queda aplicada antes del primer pintado.
+      placePopup(e.popup);
     });
-    map.on('popupclose', function () {
+    map.on('popupclose', function (e) {
       if (legendEl) legendEl.classList.remove('has-popup');
+      if (activePopup === e.popup) activePopup = null;
       if (!view.selectedLink) pinned = null;
     });
   }
@@ -689,14 +810,19 @@
       selectedActivator = document.querySelector('.project-item.is-selected') || selectedActivator;
     }
 
-    var targetZoom = options && options.source === 'list' ? Math.max(map.getZoom(), 14) : map.getZoom();
-    map.setView([p.lat, p.lon], targetZoom, { animate: true });
+    // Solo se recentra al elegir desde la lista, donde hay que ir a buscar el
+    // proyecto en el mapa. Al pulsar la burbuja ya está a la vista: moverla
+    // debajo del cursor solo desorienta.
+    var fromList = !!(options && options.source === 'list');
+    if (fromList) map.setView([p.lat, p.lon], Math.max(map.getZoom(), 14), { animate: true });
+
     if (isMobile()) {
       map.closePopup();
       openProjectSheet(p);
     } else {
       closeProjectSheet(false);
-      setTimeout(function () { marker.openPopup(); }, 180);
+      if (fromList) setTimeout(function () { openMarkerPopup(marker); }, 180);
+      else openMarkerPopup(marker);
     }
   }
 
@@ -2020,7 +2146,7 @@
       clearTimeout(rt);
       rt = setTimeout(function () {
         Object.keys(charts).forEach(function (k) { charts[k].resize(); });
-        if (map) map.invalidateSize();
+        if (map) { map.invalidateSize(); repositionOpenPopup(); }
         var nowMobile = isMobile();
         if (nowMobile !== wasMobile) {
           wasMobile = nowMobile;
@@ -2034,7 +2160,7 @@
           } else if (!nowMobile) {
             closeProjectSheet(false);
             setFiltersOpen(false);
-            if (view.selectedLink && markerByLink[view.selectedLink]) markerByLink[view.selectedLink].openPopup();
+            if (view.selectedLink && markerByLink[view.selectedLink]) openMarkerPopup(markerByLink[view.selectedLink]);
           }
         }
       }, 160);

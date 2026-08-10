@@ -29,8 +29,12 @@
   var DORM_COLOR = { '1': '#184f95', '2': '#256abf', '3': '#3987e5', '4+': '#86b6ef' };
   var DORM_ORDEN = ['1', '2', '3', '4+'];
 
-  // Rampa secuencial de la coropleta (6 pasos)
-  var SEQ = ['#1d5079', '#226695', '#267eb6', '#3595d8', '#5cadeb', '#8ecaf7'];
+  // Rampa de precio por m²: verde (más barato) -> rojo (más caro).
+  // El rojo/verde es el par que peor distinguen las personas con daltonismo, así
+  // que la rampa se construyó con la luminosidad estrictamente descendente
+  // (OKLCH L de 0.88 a 0.53, salto >= 0.06): el orden se sigue leyendo aunque el
+  // tono no se distinga, y el número siempre está en la leyenda y el tooltip.
+  var SEQ = ['#8af39c', '#9bd566', '#baaf0c', '#cd8300', '#c95b20', '#b43e37'];
 
   // ------------------------------------------------------------- formatos --
   var nfInt = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 0 });
@@ -112,7 +116,10 @@
   var map, layerDistritos, layerProyectos, legendEl;
 
   function DISTRICT_STYLE() {
-    return { color: 'rgba(255,255,255,0.14)', weight: 1, fillColor: '#ffffff', fillOpacity: 0.03 };
+    return {
+      color: 'rgba(255,255,255,0.14)', weight: 1,
+      fillColor: '#ffffff', fillOpacity: 0.03, interactive: false
+    };
   }
 
   // ------------------------------------------------------------- filtrado --
@@ -230,23 +237,16 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
       { maxZoom: 19, subdomains: 'abcd', pane: 'labels' }).addTo(map);
 
-    // Los distritos son solo contexto geográfico: contorno y tooltip, sin relleno
-    // de datos y sin filtrar al hacer clic.
+    // Los distritos son solo contexto geográfico: contorno, sin interacción
+    // alguna, para que el ratón siempre alcance las burbujas que tienen debajo.
     layerDistritos = L.geoJSON(GEO, {
-      style: DISTRICT_STYLE,
-      onEachFeature: function (feature, layer) {
-        layer.on({
-          mouseover: function () {
-            layer.setStyle({ weight: 2, color: 'rgba(255,255,255,0.5)' });
-            if (layer.bringToFront) layer.bringToFront();
-          },
-          mouseout: function () { layerDistritos.resetStyle(layer); }
-        });
-      }
+      interactive: false,
+      style: DISTRICT_STYLE
     }).addTo(map);
 
     layerProyectos = L.layerGroup().addTo(map);
     legendEl = document.getElementById('map-legend');
+    initHoverCardBridge();
 
     // El contenedor puede medir 0 px cuando Leaflet se inicializa dentro de la
     // tarjeta (según cuándo termine el layout), y entonces fitBounds salta al
@@ -311,24 +311,6 @@
   }
 
   function renderMap(sel) {
-    // Agregados por distrito: ya no pintan nada, solo alimentan el tooltip.
-    var agg = {};
-    sel.proyectos.forEach(function (p) {
-      var a = agg[p.distrito] || (agg[p.distrito] = { proyectos: 0, unidades: 0, m2: [] });
-      a.proyectos++;
-      a.unidades += p.unidades;
-      if (p.precio_m2) a.m2.push(p.precio_m2);
-    });
-    Object.keys(agg).forEach(function (d) { agg[d].precio_m2 = median(agg[d].m2); });
-
-    layerDistritos.eachLayer(function (layer) {
-      var name = layer.feature.properties.distrito;
-      layer.setStyle(DISTRICT_STYLE());
-      layer.bindTooltip(districtTooltip(name, agg[name]), {
-        sticky: true, className: 'district-tip', opacity: 1
-      });
-    });
-
     // Burbujas: área ∝ unidades disponibles, color ∝ precio mediano por m².
     var scale = quantileBreaks(sel.proyectos.map(function (p) { return p.precio_m2; }));
 
@@ -345,37 +327,78 @@
         weight: 2,
         opacity: 1
       });
-      marker.bindPopup(projectPopup(p), { maxWidth: 320, minWidth: 306, closeButton: true });
-      marker.on('mouseover', function () { marker.setStyle({ fillOpacity: 1, weight: 3 }); });
-      marker.on('mouseout', function () { marker.setStyle({ fillOpacity: 0.88, weight: 2 }); });
+      // La ficha se abre al pasar el ratón (ver bindHoverCard) y se mantiene si
+      // el puntero entra en ella, para poder pulsar el enlace al proyecto.
+      marker.bindPopup(projectPopup(p), {
+        maxWidth: 320, minWidth: 306, closeButton: true, autoPan: false
+      });
+      bindHoverCard(marker);
       layerProyectos.addLayer(marker);
     });
 
     renderLegend(scale, sel);
   }
 
-  function districtTooltip(name, a) {
-    var el = document.createElement('div');
-    var b = document.createElement('b');
-    b.textContent = name;
-    el.appendChild(b);
-    if (!a) {
-      var none = document.createElement('div');
-      none.className = 'row';
-      none.textContent = 'Sin oferta en la selección';
-      el.appendChild(none);
-      return el;
-    }
-    [[a.precio_m2 ? fmtSoles(a.precio_m2) + ' /m²' : 'Sin precio publicado', 'mediana'],
-     [fmtInt(a.proyectos) + ' proyectos', ''],
-     [fmtInt(a.unidades) + ' unidades disponibles', '']
-    ].forEach(function (row) {
-      var d = document.createElement('div');
-      d.className = 'row';
-      d.textContent = row[0] + (row[1] ? ' (' + row[1] + ')' : '');
-      el.appendChild(d);
+  /**
+   * Abre la ficha del proyecto al pasar el ratón. El cierre se retrasa unos
+   * milisegundos: si el puntero pasa del círculo a la ficha, se cancela, así el
+   * enlace y el texto siguen siendo alcanzables. Un clic la deja fijada.
+   */
+  var hoverTimer = null;
+  var pinned = null;
+
+  function bindHoverCard(marker) {
+    marker.on('mouseover', function () {
+      clearTimeout(hoverTimer);
+      marker.setStyle({ fillOpacity: 1, weight: 3 });
+      if (!pinned) marker.openPopup();
     });
-    return el;
+    marker.on('mouseout', function () {
+      marker.setStyle({ fillOpacity: 0.88, weight: 2 });
+      if (pinned === marker) return;
+      scheduleCardClose();
+    });
+    marker.on('click', function () {
+      pinned = marker;
+      marker.openPopup();
+    });
+  }
+
+  function scheduleCardClose() {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(function () { if (!pinned) map.closePopup(); }, 240);
+  }
+
+  function initHoverCardBridge() {
+    map.on('popupopen', function (e) {
+      var el = e.popup.getElement();
+      if (!el) return;
+      if (!el._hoverBound) {
+        el._hoverBound = true;
+        el.addEventListener('mouseenter', function () { clearTimeout(hoverTimer); });
+        el.addEventListener('mouseleave', function () { if (!pinned) scheduleCardClose(); });
+      }
+      flipCardIfClipped(e.popup, el);
+    });
+    map.on('popupclose', function () { pinned = null; });
+  }
+
+  /**
+   * La ficha se dibuja hacia arriba y el mapa la recorta cuando el proyecto está
+   * en la mitad superior. En ese caso la volteamos debajo del marcador y
+   * ocultamos la punta, que apuntaría al revés.
+   */
+  function flipCardIfClipped(popup, el) {
+    popup.options.offset = L.point(0, -6);
+    el.classList.remove('card-flipped');
+    popup.update();
+
+    var y = map.latLngToContainerPoint(popup.getLatLng()).y;
+    if (y - el.offsetHeight < 12) {
+      popup.options.offset = L.point(0, el.offsetHeight + 20);
+      el.classList.add('card-flipped');
+      popup.update();
+    }
   }
 
   function projectPopup(p) {
@@ -481,7 +504,7 @@
     if (scale) {
       var t = document.createElement('div');
       t.className = 'legend-title';
-      t.textContent = 'S/ por m² del proyecto';
+      t.textContent = 'S/ por m² · barato → caro';
       legendEl.appendChild(t);
 
       var ramp = document.createElement('div');
@@ -1521,7 +1544,10 @@
     document.getElementById('loader').classList.add('hide');
 
     // Punto de entrada para depurar desde la consola del navegador.
-    window.dashboard = { map: map, charts: charts, filtros: F, vista: view, render: render };
+    window.dashboard = {
+      map: map, charts: charts, filtros: F, vista: view, render: render,
+      get fichaFijada() { return pinned; }
+    };
   }
 
   Promise.all([

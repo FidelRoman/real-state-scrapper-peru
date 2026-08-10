@@ -501,6 +501,8 @@ body::before {
 
 .leaflet-popup-content { margin: 0; width: 306px !important; }
 .leaflet-popup-tip { background: var(--surface-2); border: 1px solid var(--border-strong); }
+/* Ficha volteada bajo el marcador: la punta apuntaría al revés. */
+.card-flipped .leaflet-popup-tip-container { display: none; }
 .leaflet-popup-close-button { color: var(--ink-muted) !important; padding: 8px 8px 0 0 !important; }
 .leaflet-container { font-family: var(--font); background: #0a0c10; }
 .leaflet-control-attribution {

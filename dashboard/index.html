@@ -12,18 +12,29 @@
 </head>
 <body>
 
-<div id="loader">
-  <div class="spinner"></div>
-  <p>Cargando datos del mercado…</p>
+<svg class="svg-defs" aria-hidden="true">
+  <symbol id="icon-chevron" viewBox="0 0 20 20"><path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-search" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m13 13 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="icon-filter" viewBox="0 0 20 20"><path d="M3 5h14M5.5 10h9M8 15h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="icon-close" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<div id="loader" role="status" aria-live="polite" aria-label="Cargando dashboard">
+  <div class="loader-shell" aria-hidden="true">
+    <div class="skeleton skeleton-title"></div>
+    <div class="skeleton skeleton-tools"></div>
+    <div class="skeleton skeleton-map"></div>
+  </div>
+  <p>Cargando proyectos disponibles…</p>
 </div>
 
-<div class="wrap">
+<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+<main class="wrap" id="main-content">
 
   <header class="topbar">
     <div class="brand">
       <h1>Mercado inmobiliario de <span>Lima</span></h1>
-      <p>Proyectos en venta publicados en Nexo Inmobiliario, con precios normalizados a soles y
-         geolocalizados por distrito. Filtra arriba: todo el tablero responde a la misma selección.</p>
+      <p>Explora proyectos nuevos en Lima, compara precios y encuentra las zonas que encajan con tu búsqueda.</p>
     </div>
     <div class="meta">
       <span class="meta-pill" id="meta-fecha">Actualizado —</span>
@@ -32,62 +43,110 @@
     </div>
   </header>
 
-  <!-- Filtros: una sola fila, alcance global -->
+  <div class="mobile-filter-bar">
+    <button class="mobile-filter-btn" type="button" id="filters-toggle" aria-expanded="false" aria-controls="filters">
+      <svg aria-hidden="true"><use href="#icon-filter"></use></svg>
+      Filtros <span class="filter-total" id="filter-total" hidden>0</span>
+    </button>
+    <button class="ghost-btn mobile-reset" type="button" id="btn-reset-mobile">Limpiar</button>
+  </div>
+
+  <!-- Filtros globales -->
   <section class="filters" id="filters" aria-label="Filtros">
+    <div class="filters-mobile-head">
+      <div><strong>Filtrar proyectos</strong><span id="filters-mobile-count">Todos los proyectos</span></div>
+      <button class="icon-btn" type="button" id="filters-close" aria-label="Cerrar filtros"><svg aria-hidden="true"><use href="#icon-close"></use></svg></button>
+    </div>
     <div class="filter" data-filter="distrito">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Distrito</span><span class="chev">▾</span>
+        <span class="lbl">Distrito</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="etapa">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Etapa</span><span class="chev">▾</span>
+        <span class="lbl">Etapa</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="inmobiliaria">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Inmobiliaria</span><span class="chev">▾</span>
+        <span class="lbl">Inmobiliaria</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="dorm">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Dormitorios</span><span class="chev">▾</span>
+        <span class="lbl">Dormitorios</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="tipo">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Tipo</span><span class="chev">▾</span>
+        <span class="lbl">Tipo</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="entrega">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Entrega</span><span class="chev">▾</span>
+        <span class="lbl">Entrega</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="precio">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Precio</span><span class="chev">▾</span>
+        <span class="lbl">Precio</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <div class="filter" data-filter="area">
       <button class="filter-btn" type="button" aria-expanded="false">
-        <span class="lbl">Área</span><span class="chev">▾</span>
+        <span class="lbl">Área</span><svg class="chev" aria-hidden="true"><use href="#icon-chevron"></use></svg>
       </button>
     </div>
     <button class="ghost-btn" type="button" id="btn-reset">Limpiar todo</button>
   </section>
+  <button class="filters-backdrop" id="filters-backdrop" type="button" aria-label="Cerrar filtros" hidden></button>
 
   <div class="chips" id="chips"></div>
 
+  <!-- Explorador principal -->
+  <section class="card explorer" aria-label="Explorar proyectos">
+    <div class="explorer-toolbar">
+      <div>
+        <h2 class="card-title">Encuentra tu próximo proyecto</h2>
+        <p class="card-sub">Busca por proyecto, distrito o inmobiliaria. Todos los resultados responden a tus filtros.</p>
+      </div>
+      <div class="explorer-controls">
+        <label class="project-search-wrap" for="project-search">
+          <svg aria-hidden="true"><use href="#icon-search"></use></svg>
+          <input type="search" id="project-search" placeholder="Buscar proyecto, distrito o inmobiliaria…" autocomplete="off">
+        </label>
+        <label class="sort-wrap" for="project-sort"><span>Ordenar</span>
+          <select id="project-sort">
+            <option value="price">Menor precio</option>
+            <option value="m2">Menor S/ por m²</option>
+            <option value="units">Mayor disponibilidad</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="explorer-status" id="project-status" role="status" aria-live="polite">Cargando proyectos…</div>
+    <div class="explorer-grid">
+      <div class="map-pane">
+        <div id="map" aria-label="Mapa de proyectos inmobiliarios de Lima"></div>
+        <button class="legend-toggle" id="legend-toggle" type="button" aria-expanded="false" aria-controls="map-legend">Ver leyenda</button>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+      <aside class="project-results" aria-label="Proyectos encontrados">
+        <div class="project-list" id="project-list"></div>
+        <button class="load-more" type="button" id="project-load-more" hidden>Ver más proyectos</button>
+      </aside>
+    </div>
+  </section>
+
   <!-- KPIs -->
-  <section class="kpis" aria-label="Indicadores">
+  <section class="kpis" aria-label="Resumen de la selección">
     <div class="card kpi hero">
-      <div class="label">Precio mediano por metro cuadrado</div>
+      <div class="label">Precio típico por metro cuadrado</div>
       <div class="value"><span id="kpi-m2">—</span><span class="unit">S/ /m²</span></div>
       <div class="sub" id="kpi-m2-sub">—</div>
     </div>
     <div class="card kpi">
-      <div class="label">Proyectos</div>
+      <div class="label">Proyectos encontrados</div>
       <div class="value" id="kpi-proyectos">—</div>
       <div class="sub" id="kpi-proyectos-sub">—</div>
     </div>
@@ -97,28 +156,15 @@
       <div class="sub" id="kpi-unidades-sub">—</div>
     </div>
     <div class="card kpi">
-      <div class="label">Ticket mediano</div>
+      <div class="label">Precio típico</div>
       <div class="value" id="kpi-ticket">—</div>
       <div class="sub" id="kpi-ticket-sub">—</div>
     </div>
     <div class="card kpi">
-      <div class="label">Distritos · inmobiliarias</div>
+      <div class="label">Zonas · inmobiliarias</div>
       <div class="value" id="kpi-cobertura">—</div>
       <div class="sub" id="kpi-cobertura-sub">—</div>
     </div>
-  </section>
-
-  <!-- Mapa -->
-  <section class="card map-card" aria-label="Mapa">
-    <div class="map-head">
-      <div>
-        <h2 class="card-title">Dónde está la oferta</h2>
-        <p class="card-sub">El área del círculo es proporcional a las unidades disponibles; el color va del verde
-           (más barato por m²) al rojo (más caro). Pasa el cursor por un proyecto para ver su ficha.</p>
-      </div>
-    </div>
-    <div id="map"></div>
-    <div class="map-legend" id="map-legend"></div>
   </section>
 
   <!-- Gráficos -->
@@ -129,6 +175,7 @@
         <p class="card-sub">Soles por metro cuadrado. Clic en una barra para filtrar el distrito.</p>
       </div>
       <div class="chart-box ranked" id="ch-distritos"></div>
+      <button class="chart-more" type="button" id="districts-more" hidden>Ver todos los distritos</button>
     </div>
 
     <div class="card chart-card span-3">
@@ -169,6 +216,7 @@
         <p class="card-sub">Top 15. Clic en una barra para filtrar por esa inmobiliaria.</p>
       </div>
       <div class="chart-box tall" id="ch-firmas"></div>
+      <button class="chart-more" type="button" id="firms-more" hidden>Ver las 15 inmobiliarias</button>
     </div>
 
     <div class="card chart-card span-3">
@@ -196,22 +244,24 @@
       <table id="table">
         <thead>
           <tr>
-            <th data-sort="proyecto">Proyecto</th>
-            <th data-sort="distrito">Distrito</th>
-            <th data-sort="etapa">Etapa</th>
-            <th data-sort="inmobiliaria">Inmobiliaria</th>
-            <th data-sort="modelo">Modelo</th>
-            <th class="num" data-sort="dorm">Dorm.</th>
-            <th class="num" data-sort="area">Área m²</th>
-            <th class="num" data-sort="precio_pen">Precio S/</th>
-            <th class="num" data-sort="precio_m2">S/ /m²</th>
-            <th class="num" data-sort="unidades">Unid.</th>
-            <th data-sort="entrega">Entrega</th>
+            <th data-sort="proyecto"><button type="button">Proyecto</button></th>
+            <th data-sort="distrito"><button type="button">Distrito</button></th>
+            <th data-sort="etapa"><button type="button">Etapa</button></th>
+            <th data-sort="inmobiliaria"><button type="button">Inmobiliaria</button></th>
+            <th data-sort="modelo"><button type="button">Modelo</button></th>
+            <th class="num" data-sort="dorm"><button type="button">Dorm.</button></th>
+            <th class="num" data-sort="area"><button type="button">Área m²</button></th>
+            <th class="num" data-sort="precio_pen"><button type="button">Precio S/</button></th>
+            <th class="num" data-sort="precio_m2"><button type="button">S/ /m²</button></th>
+            <th class="num" data-sort="unidades"><button type="button">Unid.</button></th>
+            <th data-sort="entrega"><button type="button">Entrega</button></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
+    <div class="unit-cards" id="unit-cards"></div>
+    <button class="load-more unit-load-more" type="button" id="unit-load-more" hidden>Ver más unidades</button>
     <div class="table-foot" id="table-foot"></div>
   </section>
 
@@ -222,6 +272,17 @@
     se cuentan pero no entran en las medianas de S/ /m².
   </p>
 
+</main>
+
+<div class="project-sheet" id="project-sheet" hidden>
+  <button class="sheet-backdrop" type="button" data-sheet-close aria-label="Cerrar detalle del proyecto"></button>
+  <section class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <button class="icon-btn sheet-close" type="button" data-sheet-close aria-label="Cerrar detalle"><svg aria-hidden="true"><use href="#icon-close"></use></svg></button>
+    <h2 class="sr-only" id="sheet-title">Detalle del proyecto</h2>
+    <div class="sheet-body" id="sheet-body"></div>
+    <div class="sheet-action"><a id="sheet-link" href="#" target="_blank" rel="noopener noreferrer">Ver proyecto en Nexo</a></div>
+  </section>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

@@ -1,0 +1,48 @@
+name: Publicar dashboard en Pages
+
+on:
+  # Al empujar cambios del dashboard: publica en un par de minutos.
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/pages.yml'
+  # Al terminar el scraper semanal: publica los datos recién regenerados.
+  workflow_run:
+    workflows: ["Ejecutar Scraper Real Estate"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez; si llegan varios, gana el último.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          ref: main   # tras el scraper, main ya trae los datos actualizados
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir la carpeta dashboard/
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+
+      - name: Desplegar
+        id: deployment
+        uses: actions/deploy-pages@v4

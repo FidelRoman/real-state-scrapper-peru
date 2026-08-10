@@ -51,31 +51,5 @@ jobs:
           git commit -m "Actualización automática de datos [skip ci]" || echo "No hay cambios para guardar"
           git push
 
-  # Publica dashboard/ en GitHub Pages. Requiere activar Pages en
-  # Settings -> Pages -> Source: GitHub Actions.
-  deploy-pages:
-    needs: run-scraper
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Configurar Pages
-        uses: actions/configure-pages@v5
-
-      - name: Subir la carpeta dashboard/
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dashboard
-
-      - name: Desplegar
-        id: deployment
-        uses: actions/deploy-pages@v4
+# La publicación en GitHub Pages vive en .github/workflows/pages.yml, que se
+# dispara al terminar este workflow y también con cada push a dashboard/.
